@@ -154,11 +154,12 @@ std::string SCIFIOImageIO::WaitForNewLines(int pipedatalength)
       readBack += std::string( pipedata, pipedatalength );
 
       // Remove any \r so that we only dealing with unix-style line endings
-      size_t backslashRIndex = readBack.find_first_of( '\r', findStart );
-      while ( backslashRIndex != std::string::npos ) {
-        readBack.erase( backslashRIndex );
-        findStart = backslashRIndex;
-      }
+      for( size_t backslashRIndex = readBack.find( "\r", findStart );
+           backslashRIndex != std::string::npos;
+           findStart = backslashRIndex )
+        {
+        readBack.erase( backslashRIndex, 1 );
+        }
 
       // if the two last char are "\n\n", then we're done
       if( readBack.size() >= 2 && readBack.substr( readBack.size()-2, 2 ) == "\n\n" )
@@ -274,7 +275,7 @@ SCIFIOImageIO::SCIFIOImageIO()
         }
       }
     }
-  std::string classpath = scifioPath + "loci_tools.jar" + SCIFIO_SEP + scifioPath + "scifio-itk-bridge-1.0.0.jar";
+  std::string classpath = scifioPath + "bioformats_package.jar" + SCIFIO_SEP + scifioPath + "scifio-itk-bridge.jar";
 
   // determine path to java executable from JAVA_HOME, if available
 #if defined(WIN32)
@@ -331,7 +332,7 @@ SCIFIOImageIO::SCIFIOImageIO()
   split(javaFlags, ' ', m_Args);
 
   // append the name of the main class to execute
-  m_Args.push_back( "loci.scifio.itk.SCIFIOITKBridge" );
+  m_Args.push_back( "io.scif.itk.SCIFIOITKBridge" );
 
   // append the command to pass to the ITK bridge
   m_Args.push_back( "waitForInput" );
@@ -570,6 +571,13 @@ bool SCIFIOImageIO::SetSeries(int series)
   seriesResult = commandOutput.substr( p0, p1 );
   itkDebugMacro("SetSeries result: " << seriesResult);
 
+  // Clear the previous dictionary entries, since we do not
+  // allow overwriting of pre-existing entries - this will
+  // allow critical metadata (such as dimension extents)
+  // to be recorded properly.
+  MetaDataDictionary & dict = this->GetMetaDataDictionary();
+  dict.Clear();
+
   return true;
 }
 
@@ -774,10 +782,6 @@ void SCIFIOImageIO::ReadImageInformation()
   // component type
   itkAssertOrThrowMacro( dict.HasKey("PixelType"), "PixelType is not in the metadata dictionary!");
   const long pixelType = GetTypedMetaData<long>(dict, "PixelType");
-  if( pixelType == UNKNOWNCOMPONENTTYPE)
-    {
-    itkExceptionMacro("Unknown pixel type: "<< pixelType);
-    }
   itkDebugMacro("Setting ComponentType: " << pixelType);
   this->SetComponentType( scifioToITKComponentType(pixelType) );
 
@@ -1151,6 +1155,7 @@ void SCIFIOImageIO::Write(const void * buffer )
 
   typedef unsigned char BYTE;
   BYTE* data = (BYTE*)buffer;
+  char donemsg[] = { 'O', 'K' };
 
   const int pipelength = 10000;
 
@@ -1173,7 +1178,6 @@ void SCIFIOImageIO::Write(const void * buffer )
       itkDebugMacro("Writing " << bytesToRead << " bytes to plane " << i << ".  Bytes read: " << bytesRead);
 
       #ifdef WIN32
-          DWORD bytesWritten;
           WriteFile( m_Pipe[1], data, bytesToRead, &bytesWritten, NULL );
       #else
           writtenBytes = write( m_Pipe[1], data, bytesToRead );
@@ -1195,11 +1199,25 @@ void SCIFIOImageIO::Write(const void * buffer )
 
     std::string planeDone;
 
+    // Hand-shake with Java signaling it's OK to send end of plane msg.
+    #ifdef WIN32
+        WriteFile( m_Pipe[1], donemsg, 2, &bytesWritten, NULL );
+    #else
+        writtenBytes = write( m_Pipe[1], donemsg, 2 );
+    #endif
+
     itkDebugMacro("Waiting for confirmation of plane read");
     planeDone = WaitForNewLines(pipedatalength);
     itkDebugMacro("Done waiting for confirmation of plane read");
   }
   std::string imageDone;
+
+  // Hand-shake with Java signaling it's OK to send end of image msg.
+  #ifdef WIN32
+      WriteFile( m_Pipe[1], donemsg, 2, &bytesWritten, NULL );
+  #else
+      writtenBytes = write( m_Pipe[1], donemsg, 2 );
+  #endif
 
   itkDebugMacro("Waiting for confirmation of image read");
   imageDone = WaitForNewLines(pipedatalength);

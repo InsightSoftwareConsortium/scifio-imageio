@@ -1,4 +1,4 @@
-# NB: For now, we use the loci_tools.jar bundle, because it is convenient,
+# NB: For now, we use the bioformats_package.jar bundle, because it is convenient,
 # and provides support for all supported file formats, including those
 # provided by the GPLed Bio-Formats library. ITK communicates with Java via
 # pipes, which is generally accepted as "indirect" enough to avoid legal
@@ -11,20 +11,27 @@
 # formats, will no longer work "out of the box" -- the user will instead
 # need to manually add the GPLed Bio-Formats JARs into the mix first.
 #
+# JRE is not downloaded for OS X. The cleanest way to have a JRE installed
+# is to let the OS X take care of it. Once the tests are run or if you call
+# scifio-imageio in your code, the OS will :
+# - ask you to install JAVA through the system update on OS 10.7 and 10.8
+# - ask you to download JAVA from Java's website and install it by yourself
+# for OS 10.9.
+#
 set( SCIFIOJars
-  http://cvs.openmicroscopy.org.uk/snapshots/bioformats/4.4.5/loci_tools.jar
-  http://jenkins.imagej.net/view/SCIFIO/job/SCIFIOITKBridge/lastSuccessfulBuild/artifact/target/scifio-itk-bridge-1.0.0.jar
+  http://downloads.openmicroscopy.org/bio-formats/5.0.4/artifacts/bioformats_package.jar
+  http://maven.imagej.net/service/local/repositories/releases/content/io/scif/scifio-itk-bridge/1.2.0/scifio-itk-bridge-1.2.0.jar
   )
 set( SCIFIOJarNames
-  loci_tools.jar
-  scifio-itk-bridge-1.0.0.jar
+  bioformats_package.jar
+  scifio-itk-bridge.jar
   )
 set( jarsDownloadDirectory jars )
 set( JAR_BUILD_TREE_LOCATION
   ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${jarsDownloadDirectory}/
   )
 set( JAR_INSTALL_TREE_LOCATION
-  ${CMAKE_INSTALL_PREFIX}/${${SCIFIO}_INSTALL_LIBRARY_DIR}/${jarsDownloadDirectory}
+  ${CMAKE_INSTALL_PREFIX}/${SCIFIO_INSTALL_LIBRARY_DIR}/${jarsDownloadDirectory}
   )
 
 # Java Runtime Environment
@@ -33,7 +40,7 @@ set( JRE_BUILD_TREE_LOCATION
   ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/jre
   )
 set( JRE_INSTALL_TREE_LOCATION
-  ${CMAKE_INSTALL_PREFIX}/${${SCIFIO}_INSTALL_LIBRARY_DIR}/jre
+  ${CMAKE_INSTALL_PREFIX}/${SCIFIO_INSTALL_LIBRARY_DIR}/jre
   )
 set( jreTarballMD5 "" )
 if( WIN32 )
@@ -64,7 +71,7 @@ set(SCIFIO_SRC
   )
 
 add_library(SCIFIO ${SCIFIO_SRC})
-target_link_libraries(SCIFIO  ${ImageBase_LIBRARIES})
+target_link_libraries(SCIFIO  ${ITKIOImageBase_LIBRARIES})
 itk_module_target(SCIFIO)
 
 # Download the SCIFIO Java libraries.
@@ -84,17 +91,20 @@ install( DIRECTORY ${JAR_BUILD_TREE_LOCATION}
   FILES_MATCHING PATTERN "*.jar"
   )
 
-configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/DownloadJRE.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/DownloadJRE.cmake
-  @ONLY
-  )
-add_custom_command(TARGET SCIFIO
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/DownloadJRE.cmake
-  WORKING_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
-  COMMENT "Downloading JRE libraries..."
-  )
-install( DIRECTORY ${JRE_BUILD_TREE_LOCATION}
-  DESTINATION ${JRE_INSTALL_TREE_LOCATION}
-  COMPONENT RuntimeLibraries
-  )
+# Download JRE except for OS X
+IF (NOT APPLE)
+  configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/DownloadJRE.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/DownloadJRE.cmake
+    @ONLY
+    )
+  add_custom_command(TARGET SCIFIO
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/DownloadJRE.cmake
+    WORKING_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
+    COMMENT "Downloading JRE libraries..."
+    )
+  install( DIRECTORY ${JRE_BUILD_TREE_LOCATION}
+    DESTINATION ${JRE_INSTALL_TREE_LOCATION}
+    COMPONENT RuntimeLibraries
+    )
+endif()

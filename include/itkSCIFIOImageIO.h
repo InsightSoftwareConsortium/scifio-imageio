@@ -15,9 +15,10 @@
  *  limitations under the License.
  *
  *=========================================================================*/
-#ifndef __itkSCIFIOImageIO_h
-#define __itkSCIFIOImageIO_h
+#ifndef itkSCIFIOImageIO_h
+#define itkSCIFIOImageIO_h
 
+#include "SCIFIOExport.h"
 #include "itkStreamingImageIOBase.h"
 
 #include "itksys/Process.h"
@@ -50,7 +51,7 @@ namespace itk
  *   formats (PFFs), particularly those in life sciences disciplines.
  *
  * Note that none of the above are required at build time. By default, the
- * Bio-Formats Java libraries (loci_tools.jar, which is a bundle of all
+ * Bio-Formats Java libraries (bioformats_package.jar, which is a bundle of all
  * SCIFIO & Bio-Formats libraries including dependencies) are downloaded at
  * build time and placed into the lib/Jars subfolder of the build tree.
  * A distributable JRE is also downloaded at build time.
@@ -76,7 +77,7 @@ namespace itk
  *
  * \ingroup SCIFIO
  */
-class ITK_EXPORT SCIFIOImageIO : public StreamingImageIOBase
+class SCIFIO_EXPORT SCIFIOImageIO : public StreamingImageIOBase
 {
 public:
   typedef SCIFIOImageIO               Self;
@@ -200,4 +201,4 @@ private:
 };
 } // end namespace itk
 
-#endif // __itkSCIFIOImageIO_h
+#endif // itkSCIFIOImageIO_h
